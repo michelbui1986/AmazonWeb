@@ -2,6 +2,9 @@ const express = require("express");
 const router = new express.Router();
 const Products = require("../models/productSchema");
 const USER = require("../models/usersSchema");
+const bcrypt = require("bcryptjs");
+const authenticate = require("../middleware/authenticate");
+
 
 // get the products data
 router.get("/getproducts", async (req, res) => {
@@ -66,5 +69,104 @@ router.post("/register", async (req, res) => {
     return res.status(500).json({ error: error.message });
   }
 });
+
+// login user api
+router.post("/login", async (req, res) => {
+  // console.log(req.body);
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "fill the details" });
+  }
+
+  try {
+    const userLogin = await USER.findOne({ email: email });
+    console.log(userLogin);
+    if (userLogin) {
+      const isMatch = await bcrypt.compare(password, userLogin.password);
+      console.log(isMatch);
+
+      if (!isMatch) {
+        res.status(400).json({ error: "invalid crediential pass" });
+      } else {
+        const token = await userLogin.generateAuthToken();
+        console.log("TOKEN IS:", token);
+        res.cookie("Amazon", token, {
+          httpOnly: true,
+        });
+        res.status(201).json(userLogin);
+      }
+    } else {
+      res.status(400).json({ error: "user not exist" });
+    }
+  } catch (error) {
+    res.status(400).json({ error: "invalid crediential pass" });
+    console.log("error login time" + error.message);
+  }
+});
+
+router.post("/addcart/:id", authenticate, async (req, res) => {
+  try {
+    // console.log("perfect 6");
+    const { id } = req.params;
+    const cart = await Products.findOne({ id: id });
+    // console.log(cart + "cart value");
+    const UserContact = await USER.findOne({ _id: req.userID });
+    // console.log(UserContact);
+
+    if (UserContact) {
+      const cartData = await UserContact.addCartData(cart);
+      await UserContact.save();
+      // console.log(cartData);
+      res.status(201).json(UserContact);
+      console.log("Success");
+    } else {
+      res.status(401).json({ error: "invalid user" });
+    }
+  } catch (error) {
+    res.status(401).json({ error: "invalid user" });
+  }
+});
+
+// get cart details
+
+router.get("/cartdetails", authenticate, async (req, res) => {
+  try {
+    const buyUser = await USER.findOne({ _id: req.userID });
+    res.status(201).json(buyUser);
+  } catch (error) {
+    console.log("error: ", error);
+  }
+});
+
+// get valid user
+router.get("/validuser", authenticate, async (req, res) => {
+  try {
+    const validuserone = await USER.findOne({ _id: req.userID });
+    res.status(201).json(validuserone);
+  } catch (error) {
+    console.log("error: ", error);
+  }
+});
+
+// remove item from the cart
+
+router.delete("/remove/:id", authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    req.rootUser.carts = req.rootUser.carts.filter((cruval) => {
+      return cruval.id != id;
+    });
+
+    req.rootUser.save();
+    res.status(201).json(req.rootUser);
+    console.log("item remove");
+  } catch (error) {
+    console.log(error + "jwt provide then remove");
+    res.status(400).json(error);
+  }
+});
+
 
 module.exports = router;

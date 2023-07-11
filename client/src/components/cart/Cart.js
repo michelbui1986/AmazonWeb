@@ -1,9 +1,16 @@
 import React, { useEffect, useState, useContext } from "react";
 import { Divider } from "@mui/material";
 import { useParams, useNavigate, NavLink } from "react-router-dom";
+// import { useParams, useNavigate, NavLink } from "react-router-dom";
+
+
 import "./cart.css";
+import { LoginContext } from "../context/ContextProvider";
+
 const Cart = () => {
+  const history = useNavigate();
   const { id } = useParams("");
+  const { account, setAccount } = useContext(LoginContext);
   const [inddata, setIndedata] = useState({});
   const getinddata = async () => {
     const res = await fetch(`http://localhost:8005/getproductsone/${id}`, {
@@ -28,6 +35,32 @@ const Cart = () => {
   let day = date.getDate();
   let month = date.getMonth() + 1;
   let year = date.getFullYear();
+
+  const addToCart = async (id) => {
+    try {
+      const checkResult = await fetch(`http://localhost:8005/addcart/${id}`, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ inddata }),
+        credentials: "include",
+      });
+
+      if (checkResult.status === 401) {
+        console.log("user invalid");
+      } else {
+        const data1 = await checkResult.json();
+        console.log("test", data1, " frontend data");
+        alert("data added to your cart");
+        history("/buynow");
+        setAccount(data1);
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
   return (
     <div className="cart_section">
       {inddata && Object.keys(inddata).length && (
@@ -35,7 +68,11 @@ const Cart = () => {
           <div className="left_cart">
             <img src={inddata.detailUrl} alt="cart" />
             <div className="cart_btn">
-              <button className="cart_btn1">Add to Cart</button>
+              <button
+                className="cart_btn1"
+                onClick={() => addToCart(inddata.id)}>
+                Add to Cart
+              </button>
               <NavLink to="/buynow">
                 <button className="cart_btn1">Buy now</button>
               </NavLink>
